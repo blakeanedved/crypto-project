@@ -2,27 +2,47 @@ use std::net::{TcpListener, TcpStream, Shutdown};
 use std::thread;
 use std::io::{Read, Write};
 
-use crypto_bigint::U1024;
-
 //use crate::rsa::{RSAPubKey, rsa_key_gen, rsa_encrypt};
 use crate::Args;
 
-fn handle_client(mut stream: TcpStream) {
-    let mut data = [0 as u8; 50];
-
-    loop {
-        match stream.read(&mut data) {
+macro_rules! stream_read_size {
+    ($stream:ident($size:expr) -> $data:ident $block:block) => {
+        match $stream.read(&mut $data) {
             Ok(size) => {
-                break;
+                if size != $size {
+                    eprintln!("An error occurred, terminating connection with {}\nError: invalid size for data stream", $stream.peer_addr().unwrap());
+                    $stream.shutdown(Shutdown::Both).unwrap();
+                    return;
+                } else {
+                    $block
+                }
             }
             Err(e) => {
-                eprintln!("An error occurred, terminating connection with {}\nError: {}", stream.peer_addr().unwrap(), e);
-                stream.shutdown(Shutdown::Both).unwrap();
-
-                break;
+                eprintln!("An error occurred, terminating connection with {}\nError: {}", $stream.peer_addr().unwrap(), e);
+                $stream.shutdown(Shutdown::Both).unwrap();
+                return;
             }
         }
     }
+}
+
+fn as_u32_be(array: &[u8]) -> u32 {
+    ((array[0] as u32) << 24) +
+    ((array[1] as u32) << 16) +
+    ((array[2] as u32) <<  8) +
+    ((array[3] as u32) <<  0)
+}
+
+fn handle_client(mut stream: TcpStream) {
+    let mut data = [0 as u8; 100];
+
+    let (n_size, e_size) = stream_read_size!(stream(8) -> data {
+        (as_u32_be(&data[0..4]), as_u32_be(&data[4..8]))
+    });
+
+    let n = stream_read_size!(stream(n_size as usize) -> data { 
+        
+    });
 }
 
 pub fn start(args: Args) -> anyhow::Result<()> {
