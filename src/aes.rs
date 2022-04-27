@@ -1,12 +1,14 @@
-fn aes_key_expansion(key: i32) -> i64 {
-    0
+use rug::Integer;
+
+fn aes_key_expansion(key: Integer) -> Integer {
+    Integer::new()
 }
 
-fn aes_key_gen(length: Option<i32>) -> i64 {
+fn aes_key_gen(length: Option<i32>) -> Integer {
     let length = if let Some(length) = length {
         length
     } else {
         128
     };
-    0
+    Integer::new()
 }
