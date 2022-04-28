@@ -1,13 +1,27 @@
 use rug::{Complete, Integer};
 
+#[derive(Debug)]
 pub struct RSAPublicKey {
     n: Integer,
     e: Integer,
 }
 
+#[derive(Debug)]
 pub struct RSAPrivateKey {
     d: Integer,
     n: Integer,
+}
+
+impl RSAPublicKey {
+    pub fn new(n: Integer, e: Integer) -> Self {
+        Self { n, e }
+    }
+}
+
+impl RSAPrivateKey {
+    pub fn new(n: Integer, d: Integer) -> Self {
+        Self { n, d }
+    }
 }
 
 pub fn rsa_encrypt(key: RSAPublicKey, message: Integer) -> Integer {
@@ -33,9 +47,10 @@ pub fn rsa_key_gen() -> (RSAPublicKey, RSAPrivateKey) {
     let mut n = Integer::new();
     (&p * &q).complete_into(&mut n);
     let phi = (p - 1u32).lcm(&(q - 1u32));
-    let e = Integer::from(65537i32);
+    let e = Integer::from(67i32);
     let mut d = Integer::new();
     (1u32 / &e).complete_into(&mut d);
+    // println!("phi={}", 1u32 / &e);
     d = d % phi;
 
     (RSAPublicKey { n: n.clone(), e }, RSAPrivateKey { d, n })
