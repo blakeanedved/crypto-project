@@ -1,7 +1,4 @@
 use crate::aes;
-use crate::aes::matrix_mul;
-use crate::rsa;
-use rug::Integer;
 
 pub fn test() {
     let x = aes::AES::new();
@@ -11,7 +8,7 @@ pub fn test() {
     ];
     let c = x.encrypt(message);
     println!("{:x?}", c);
-    println!("Answer = {:x?}", x.decrypt(c));
+    println!("Answer = {:x?}", x.decrypt(&c[..]));
     // print!(
     //     "{:x?}",
     //     x.decrypt(vec![

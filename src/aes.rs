@@ -256,49 +256,14 @@ impl AES {
         encoded
     }
 
-    pub fn decrypt(&self, message: Vec<u8>) -> Vec<u8> {
-        let mut i = 0;
-        let mut count: u128 = 0;
-        let mut encoded: Vec<u8> = vec![];
-        let mut block: Vec<u8> = vec![];
-
-        while i < message.len() {
-            block.push(message[i]);
-            if (i + 1) % 16 == 0 || i == message.len() - 1 {
-                let c: [u8; 16] = count.to_be_bytes();
-                let mut counter = [[0 as u8; 4]; 4];
-                for j in 0..4 {
-                    for k in 0..4 {
-                        counter[k][j] = c[j * 4 + k] ^ self.iv[j][k]
-                    }
-                }
-
-                let cipher_text = self.encrypt_block(counter);
-                for (i, e) in block.iter().enumerate() {
-                    encoded.push(e ^ cipher_text[i]);
-                }
-                count += 1;
-                block.clear();
-            }
-            i += 1;
-        }
-        encoded
+    pub fn decrypt(&self, message: &[u8]) -> Vec<u8> {
+        self.encrypt(message)
     }
 
     pub fn encrypt_block(&self, message: [[u8; 4]; 4]) -> Vec<u8> {
         let mut cipher_text: [[u8; 4]; 4] = message;
-        // if message.len() > 16 {
-        //     unimplemented!()
-        // } else {
-        //     for (i, e) in message.iter().enumerate() {
-        //         cipher_text[i % 4][i / 4] = *e;
-        //     }
-        // }
         let r_keys = self.key_expansion();
 
-        // for (i, e) in message.iter().enumerate() {
-        //     cipher_text[i / 4][i % 4] = e ^ r_keys[i];
-        // }
         for i in 0..4 {
             for j in 0..4 {
                 cipher_text[j][i] = cipher_text[j][i] ^ r_keys[i * 4 + j];
@@ -347,9 +312,6 @@ impl AES {
     #[allow(dead_code)]
     pub fn decrypt_block(&self, encoded: [[u8; 4]; 4]) -> Vec<u8> {
         let mut cipher_text: [[u8; 4]; 4] = encoded;
-        // for (i, e) in encoded.iter().enumerate() {
-        //     cipher_text[i / 4][i % 4] = *e;
-        // }
 
         let rkeys = self.key_expansion();
         for r in (0..224).step_by(16) {
