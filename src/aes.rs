@@ -161,32 +161,59 @@ static GF_14: [u8; 256] = [
 
 #[derive(Debug)]
 pub struct AES {
-    key: [u8; 32],
-    iv: [[u8; 4]; 4],
+    pub key: [u8; 32],
+    pub iv: [[u8; 4]; 4],
+    pub expanded_key: [u8; 240]
+}
+
+impl std::fmt::Display for AES {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let mut iv = String::new();
+        for i in 0..4 {
+            iv.push_str(&format!("\t\t{:?}\n", self.iv[i]));
+
+        }
+        write!(f, "AES {{\n\tkey: {:?},\n\tiv: [\n{}\t],\n\texpanded_key = [u8; 240]\n}}", self.key, iv)
+    }
 }
 
 impl AES {
     pub fn new() -> Self {
+        let key: [u8; 32] = thread_rng().gen();
         Self {
-            key: thread_rng().gen(),
-            // key: {
-            //     // [0 as u8; 32]
-            //     // k[31] = 1 as u8;
-
-            //     [
-            //         0x60, 0x3d, 0xeb, 0x10, 0x15, 0xca, 0x71, 0xbe, 0x2b, 0x73, 0xae, 0xf0, 0x85,
-            //         0x7d, 0x77, 0x81, 0x1f, 0x35, 0x2c, 0x07, 0x3b, 0x61, 0x08, 0xd7, 0x2d, 0x98,
-            //         0x10, 0xa3, 0x09, 0x14, 0xdf, 0xf4,
-            //     ]
-            // },
+            key,
             iv: thread_rng().gen(),
+            expanded_key: AES::key_expansion(&key),
         }
     }
 
-    pub fn key_expansion(&self) -> [u8; 240] {
+    pub fn from_key_and_iv(key: &[u8], iv: &[u8]) -> Self {
+        let key = {
+            let mut x = [0 as u8; 32];
+            for i in 0..32 {
+                x[i] = key[i];
+            }
+            x
+        };
+        Self {
+            key,
+            iv: {
+                let mut x = [[0 as u8; 4]; 4];
+                for i in 0..4 {
+                    for j in 0..4 {
+                        x[i][j] = iv[i*4+j];
+                    }
+                }
+                x
+            },
+            expanded_key: AES::key_expansion(&key)
+        }
+    }
+
+    pub fn key_expansion(key: &[u8; 32]) -> [u8; 240] {
         let mut keys: [u8; 240] = [0 as u8; 240];
         for i in 0..32 {
-            keys[i] = self.key[i];
+            keys[i] = key[i];
         }
         let mut c = 32;
         let mut r = 1;
@@ -218,13 +245,7 @@ impl AES {
                 c += 1;
             }
         }
-        // println!("Expanded Key");
-        // for (e, i) in keys.iter().enumerate() {
-        //     if e % 16 == 0 {
-        //         println!();
-        //     }
-        //     print!("{:x} ", i);
-        // }
+
         keys
     }
 
@@ -262,11 +283,10 @@ impl AES {
 
     pub fn encrypt_block(&self, message: [[u8; 4]; 4]) -> Vec<u8> {
         let mut cipher_text: [[u8; 4]; 4] = message;
-        let r_keys = self.key_expansion();
 
         for i in 0..4 {
             for j in 0..4 {
-                cipher_text[j][i] = cipher_text[j][i] ^ r_keys[i * 4 + j];
+                cipher_text[j][i] = cipher_text[j][i] ^ self.expanded_key[i * 4 + j];
             }
         }
         for r in (0..224).step_by(16) {
@@ -297,7 +317,7 @@ impl AES {
 
             for i in 0..4 {
                 for j in 0..4 {
-                    cipher_text[i][j] ^= r_keys[r + 16 + i * 4 + j];
+                    cipher_text[i][j] ^= self.expanded_key[r + 16 + i * 4 + j];
                 }
             }
         }
@@ -313,11 +333,10 @@ impl AES {
     pub fn decrypt_block(&self, encoded: [[u8; 4]; 4]) -> Vec<u8> {
         let mut cipher_text: [[u8; 4]; 4] = encoded;
 
-        let rkeys = self.key_expansion();
         for r in (0..224).step_by(16) {
             for i in 0..4 {
                 for j in 0..4 {
-                    cipher_text[i][j] ^= rkeys[240 - (r + 16) + i * 4 + j]
+                    cipher_text[i][j] ^= self.expanded_key[240 - (r + 16) + i * 4 + j]
                 }
             }
             if r != 0 {
@@ -347,10 +366,18 @@ impl AES {
         let mut message: Vec<u8> = vec![];
         for i in 0..4 {
             for j in 0..4 {
-                message.push(cipher_text[i][j] ^ rkeys[i * 4 + j]);
+                message.push(cipher_text[i][j] ^ self.expanded_key[i * 4 + j]);
             }
         }
         message
+    }
+
+    #[allow(dead_code)]
+    pub fn key_to_vec(&self) -> Vec<u8> {
+        let mut v = Vec::with_capacity(48);
+        v.extend(&self.key[..]);
+        v.extend(&unsafe { std::mem::transmute::<[[u8; 4]; 4], [u8; 16]>(self.iv) }[..]);
+        v
     }
 }
 

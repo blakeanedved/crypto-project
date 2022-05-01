@@ -1,4 +1,4 @@
-use std::net::{TcpListener, TcpStream, Shutdown};
+use std::net::{TcpListener, TcpStream};
 use std::thread;
 use std::io::{Read, Write};
 use rug::Integer;
@@ -6,11 +6,12 @@ use rug::integer::Order;
 
 use crate::Args;
 use crate::rsa::{RSAPublicKey, rsa_encrypt};
+use crate::aes::AES;
 
 #[macro_export]
 macro_rules! stream_read {
     ($stream:ident($size:ident) -> $data:ident $block:block) => {
-        use std::net::{Shutdown, TcpStream};
+        use std::net::Shutdown;
         use std::io::Read;
         match $stream.read(&mut $data) {
             Ok($size) => $block
@@ -41,7 +42,8 @@ fn as_u32_be(array: &[u8]) -> u32 {
     ((array[3] as u32) <<  0)
 }
 
-fn handle_client(mut stream: TcpStream) {
+fn handle_client(mut stream: TcpStream, args: Args) {
+    let stream_id = stream.peer_addr().unwrap();
     let mut data = [0 as u8; 600];
 
     let (n, e) = stream_read!(stream -> data {
@@ -56,13 +58,46 @@ fn handle_client(mut stream: TcpStream) {
 
     let rsa_pub_key = RSAPublicKey::new(n, e);
 
-    println!("RSA key retrival successful: {:?}", rsa_pub_key);
+    if args.debug {
+        println!("{}: RSA key retrival successful: {}", stream_id, rsa_pub_key);
+    } else {
+        println!("{}: RSA key retrival successful", stream_id);
+    }
 
-    let message = Integer::from(43);
+    let aes = AES::new();
+
+    if args.debug {
+        println!("{}: {}", stream_id, aes);
+    }
+    
+    let message = aes.key_to_vec();
+
+    let message = Integer::from_digits(&message[..], Order::Msf);
 
     let enc_key = rsa_encrypt(&rsa_pub_key, message);
-    
+
     stream.write(&enc_key.to_digits::<u8>(Order::Msf)[..]).unwrap();
+    
+    loop {
+        stream_read!(stream(size) -> data {
+            if args.debug {
+                println!("{}: enc_msg={:?}", stream_id, &data[0..size]);
+            }
+            let dec_msg = aes.decrypt(&data[0..size]);
+            if args.debug {
+                println!("{}: dec_msg={:?}", stream_id, &dec_msg[..]);
+            }
+            let message = String::from_utf8_lossy(&dec_msg[..]).to_string();
+            if message.len() == 0 { break; }
+
+            println!("{}: Recieved message: {}", stream_id, message);
+
+            let enc = aes.encrypt(&message.as_bytes()[..]);
+            stream.write(&enc[..]).unwrap();
+        });
+    }
+
+    println!("{}: Connection terminated", stream_id);
 }
 
 pub fn start(args: Args) -> anyhow::Result<()> {
@@ -70,13 +105,14 @@ pub fn start(args: Args) -> anyhow::Result<()> {
 
     println!("Server listening on port {}", args.port);
 
+
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {
                 println!("New connection from {}", stream.peer_addr()?);
-
+                let args = args.clone();
                 thread::spawn(move || {
-                    handle_client(stream);
+                    handle_client(stream, args);
                 });
             }
             Err(e) => {
