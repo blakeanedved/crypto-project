@@ -34,9 +34,11 @@ pub fn client(args: Args) -> anyhow::Result<()> {
 
     let data: [u8; 8] = unsafe { std::mem::transmute([n_size.to_be(), e_size.to_be()]) };
 
-    stream.write(&data)?;
-    stream.write(&n[..])?;
-    stream.write(&e[..])?;
+    let mut rsa_data = vec![];
+    rsa_data.extend(data);
+    rsa_data.extend(&n[..]);
+    rsa_data.extend(&e[..]);
+    stream.write(&rsa_data)?;
 
     let mut data = [0 as u8; 1024];
 

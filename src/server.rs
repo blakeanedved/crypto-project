@@ -1,4 +1,4 @@
-use std::net::{TcpListener, TcpStream};
+use std::net::{TcpListener, TcpStream, Shutdown};
 use std::thread;
 use std::io::{Read, Write};
 use rug::Integer;
@@ -11,8 +11,6 @@ use crate::aes::AES;
 #[macro_export]
 macro_rules! stream_read {
     ($stream:ident($size:ident) -> $data:ident $block:block) => {
-        use std::net::Shutdown;
-        use std::io::Read;
         match $stream.read(&mut $data) {
             Ok($size) => $block
             Err(e) => {
@@ -28,7 +26,7 @@ macro_rules! stream_read {
             Ok(_) => $block
             Err(e) => {
                 eprintln!("An error occurred, terminating connection with {}\nError: {}", $stream.peer_addr().unwrap(), e);
-                $stream.shutdown(std::net::Shutdown::Both).unwrap();
+                $stream.shutdown(Shutdown::Both).unwrap();
                 return;
             }
         }
@@ -46,7 +44,9 @@ fn handle_client(mut stream: TcpStream, args: Args) {
     let stream_id = stream.peer_addr().unwrap();
     let mut data = [0 as u8; 600];
 
-    let (n, e) = stream_read!(stream -> data {
+    let (n, e) = stream_read!(stream(size) -> data {
+
+        println!("data={:?}", &data[0..size]);
         let n_size = as_u32_be(&data[0..4]) as usize;
         let e_size = as_u32_be(&data[4..8]) as usize;
 
@@ -55,6 +55,10 @@ fn handle_client(mut stream: TcpStream, args: Args) {
 
         (n, e)
     });
+
+    if args.debug {
+        println!("e={}\nn={}", &e, &n);
+    }
 
     let rsa_pub_key = RSAPublicKey::new(n, e);
 
