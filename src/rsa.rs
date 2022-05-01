@@ -1,4 +1,5 @@
 use rug::{Complete, Integer};
+use rug::integer::Order;
 
 #[derive(Debug)]
 pub struct RSAPublicKey {
@@ -32,7 +33,8 @@ pub fn rsa_encrypt(key: &RSAPublicKey, message: Integer) -> Integer {
     c
 }
 
-pub fn rsa_decrypt(key: &RSAPrivateKey, message: Integer) -> Integer {
+pub fn rsa_decrypt(key: &RSAPrivateKey, message: &[u8]) -> Integer {
+    let message = Integer::from_digits(message, Order::Msf);
     let m = match message.pow_mod(&key.d, &key.n) {
         Ok(m) => m,
         Err(_) => unreachable!(),
