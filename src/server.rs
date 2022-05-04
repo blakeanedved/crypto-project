@@ -1,12 +1,10 @@
-use std::net::{TcpListener, TcpStream, Shutdown};
-use std::thread;
 use std::io::{Read, Write};
-use rug::Integer;
-use rug::integer::Order;
+use std::net::{Shutdown, TcpListener, TcpStream};
+use std::thread;
 
-use crate::Args;
-use crate::rsa::{RSAPublicKey, rsa_encrypt};
 use crate::aes::AES;
+use crate::rsa::{rsa_encrypt, RSAPublicKey};
+use crate::Args;
 
 #[macro_export]
 macro_rules! stream_read {
@@ -34,36 +32,32 @@ macro_rules! stream_read {
 }
 
 fn as_u32_be(array: &[u8]) -> u32 {
-    ((array[0] as u32) << 24) +
-    ((array[1] as u32) << 16) +
-    ((array[2] as u32) <<  8) +
-    ((array[3] as u32) <<  0)
+    ((array[0] as u32) << 24)
+        + ((array[1] as u32) << 16)
+        + ((array[2] as u32) << 8)
+        + ((array[3] as u32) << 0)
 }
 
 fn handle_client(mut stream: TcpStream, args: Args) {
     let stream_id = stream.peer_addr().unwrap();
     let mut data = [0 as u8; 600];
 
-    let (n, e) = stream_read!(stream(size) -> data {
-
-        println!("data={:?}", &data[0..size]);
+    let rsa_pub_key = stream_read!(stream -> data {
         let n_size = as_u32_be(&data[0..4]) as usize;
         let e_size = as_u32_be(&data[4..8]) as usize;
 
-        let n = Integer::from_digits(&data[8..8+n_size], Order::Msf);
-        let e = Integer::from_digits(&data[8+n_size..8+n_size+e_size], Order::Msf);
-
-        (n, e)
+        RSAPublicKey::from_bytes(&data[8..8+n_size], &data[8+n_size..8+n_size+e_size])
     });
 
     if args.debug {
-        println!("e={}\nn={}", &e, &n);
+        println!("e={}\nn={}", &rsa_pub_key.e, &rsa_pub_key.n);
     }
 
-    let rsa_pub_key = RSAPublicKey::new(n, e);
-
     if args.debug {
-        println!("{}: RSA key retrival successful: {}", stream_id, rsa_pub_key);
+        println!(
+            "{}: RSA key retrival successful: {}",
+            stream_id, rsa_pub_key
+        );
     } else {
         println!("{}: RSA key retrival successful", stream_id);
     }
@@ -73,15 +67,13 @@ fn handle_client(mut stream: TcpStream, args: Args) {
     if args.debug {
         println!("{}: {}", stream_id, aes);
     }
-    
+
     let message = aes.key_to_vec();
 
-    let message = Integer::from_digits(&message[..], Order::Msf);
+    let enc_key = rsa_encrypt(&rsa_pub_key, &message[..]);
 
-    let enc_key = rsa_encrypt(&rsa_pub_key, message);
+    stream.write(&enc_key[..]).unwrap();
 
-    stream.write(&enc_key.to_digits::<u8>(Order::Msf)[..]).unwrap();
-    
     loop {
         stream_read!(stream(size) -> data {
             if args.debug {
@@ -108,7 +100,6 @@ pub fn start(args: Args) -> anyhow::Result<()> {
     let listener = TcpListener::bind(format!("0.0.0.0:{}", args.port))?;
 
     println!("Server listening on port {}", args.port);
-
 
     for stream in listener.incoming() {
         match stream {

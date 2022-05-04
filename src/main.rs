@@ -1,9 +1,14 @@
 mod aes;
+mod client;
+#[cfg(target_os = "unix")]
+mod miller_rabin;
+#[cfg(target_os = "windows")]
+mod miller_rabin_win;
 mod rsa;
 mod server;
-mod client;
 mod utils;
-mod miller_rabin;
+
+extern crate num_bigint_dig as num_bigint;
 
 use clap::{Parser, Subcommand};
 
@@ -24,10 +29,10 @@ pub struct Args {
 pub enum Commands {
     Client {
         #[clap(long, default_value = "127.0.0.1")]
-        host: String
+        host: String,
     },
     Server,
-    Test
+    Test,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -36,7 +41,7 @@ fn main() -> anyhow::Result<()> {
     match args.command {
         Commands::Client { .. } => client::client(args)?,
         Commands::Server => server::start(args)?,
-        Commands::Test => utils::test()
+        Commands::Test => utils::test(),
     }
 
     Ok(())

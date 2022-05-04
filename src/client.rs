@@ -1,14 +1,13 @@
+use std::io::{Read, Write};
 use std::net::TcpStream;
-use rug::integer::Order;
-use std::io::{Write, Read};
 
-use crate::{Args, aes::AES, Commands};
-use crate::rsa::{rsa_key_gen, rsa_decrypt};
+use crate::rsa::{rsa_decrypt, rsa_key_gen};
+use crate::{aes::AES, Args, Commands};
 
 pub fn client(args: Args) -> anyhow::Result<()> {
     let host = match args.command {
         Commands::Client { host } => host,
-        _ => unreachable!()
+        _ => unreachable!(),
     };
 
     println!("Connecting to {}:{}", host, args.port);
@@ -26,8 +25,7 @@ pub fn client(args: Args) -> anyhow::Result<()> {
 
     println!("Exchanging RSA key");
 
-    let n = rsa_pub_key.n.to_digits::<u8>(Order::Msf);
-    let e = rsa_pub_key.e.to_digits::<u8>(Order::Msf);
+    let (n, e) = rsa_pub_key.to_bytes();
 
     let n_size = n.len() as u32;
     let e_size = e.len() as u32;
@@ -46,7 +44,7 @@ pub fn client(args: Args) -> anyhow::Result<()> {
 
     println!("Recieved AES key, decrypting...");
 
-    let aes_key = rsa_decrypt(&rsa_priv_key, &data[0..size]).to_digits::<u8>(Order::Msf);
+    let aes_key = rsa_decrypt(&rsa_priv_key, &data[0..size]);
 
     let aes = AES::from_key_and_iv(&aes_key[0..32], &aes_key[32..48]);
 
@@ -62,7 +60,14 @@ pub fn client(args: Args) -> anyhow::Result<()> {
         let mut buffer = String::new();
         std::io::stdin().read_line(&mut buffer)?;
         buffer.pop();
-        if buffer == String::from("quit") { break; }
+
+        if cfg!(target_os = "windows") {
+            buffer.pop();
+        }
+
+        if buffer == String::from("quit") {
+            break;
+        }
 
         if args.debug {
             println!("pre_enc={:?}", buffer.as_bytes());
