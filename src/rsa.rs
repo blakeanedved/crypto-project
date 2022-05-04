@@ -1,34 +1,34 @@
-#[cfg(target_os = "unix")]
+#[cfg(target_family = "unix")]
 use crate::miller_rabin::miller_rabin;
-#[cfg(target_os = "windows")]
+#[cfg(target_family = "windows")]
 use crate::miller_rabin_win::miller_rabin;
-#[cfg(target_os = "windows")]
+#[cfg(target_family = "windows")]
 use num_bigint::BigUint;
-#[cfg(target_os = "unix")]
+#[cfg(target_family = "unix")]
 use rug::{integer::Order, Complete, Integer};
 
-#[cfg(target_os = "unix")]
+#[cfg(target_family = "unix")]
 #[derive(Debug)]
 pub struct RSAPublicKey {
     pub n: Integer,
     pub e: Integer,
 }
 
-#[cfg(target_os = "unix")]
+#[cfg(target_family = "unix")]
 #[derive(Debug)]
 pub struct RSAPrivateKey {
     pub d: Integer,
     pub n: Integer,
 }
 
-#[cfg(target_os = "windows")]
+#[cfg(target_family = "windows")]
 #[derive(Debug)]
 pub struct RSAPublicKey {
     pub n: BigUint,
     pub e: BigUint,
 }
 
-#[cfg(target_os = "windows")]
+#[cfg(target_family = "windows")]
 #[derive(Debug)]
 pub struct RSAPrivateKey {
     pub d: BigUint,
@@ -48,30 +48,30 @@ impl std::fmt::Display for RSAPrivateKey {
 }
 
 impl RSAPublicKey {
-    #[cfg(target_os = "unix")]
+    #[cfg(target_family = "unix")]
     pub fn new(n: Integer, e: Integer) -> Self {
         Self { n, e }
     }
 
-    #[cfg(target_os = "windows")]
+    #[cfg(target_family = "windows")]
     pub fn new(n: BigUint, e: BigUint) -> Self {
         Self { n, e }
     }
 
-    #[cfg(target_os = "unix")]
+    #[cfg(target_family = "unix")]
     pub fn to_bytes(&self) -> (Vec<u8>, Vec<u8>) {
         (
-            rsa_pub_key.n.to_digits::<u8>(Order::Msf),
-            rsa_pub_key.e.to_digits::<u8>(Order::Msf),
+            self.n.to_digits::<u8>(Order::Msf),
+            self.e.to_digits::<u8>(Order::Msf),
         )
     }
 
-    #[cfg(target_os = "windows")]
+    #[cfg(target_family = "windows")]
     pub fn to_bytes(&self) -> (Vec<u8>, Vec<u8>) {
         (self.n.to_bytes_be(), self.e.to_bytes_be())
     }
 
-    #[cfg(target_os = "unix")]
+    #[cfg(target_family = "unix")]
     pub fn from_bytes(n: &[u8], e: &[u8]) -> Self {
         RSAPublicKey::new(
             Integer::from_digits(n, Order::Msf),
@@ -79,25 +79,25 @@ impl RSAPublicKey {
         )
     }
 
-    #[cfg(target_os = "windows")]
+    #[cfg(target_family = "windows")]
     pub fn from_bytes(n: &[u8], e: &[u8]) -> Self {
         RSAPublicKey::new(BigUint::from_bytes_be(n), BigUint::from_bytes_be(e))
     }
 }
 
 impl RSAPrivateKey {
-    #[cfg(target_os = "unix")]
+    #[cfg(target_family = "unix")]
     pub fn new(n: Integer, d: Integer) -> Self {
         Self { n, d }
     }
 
-    #[cfg(target_os = "windows")]
+    #[cfg(target_family = "windows")]
     pub fn new(n: BigUint, d: BigUint) -> Self {
         Self { n, d }
     }
 }
 
-#[cfg(target_os = "unix")]
+#[cfg(target_family = "unix")]
 pub fn rsa_encrypt(key: &RSAPublicKey, message: &[u8]) -> Vec<u8> {
     let message = Integer::from_digits(message, Order::Msf);
     let c = match message.pow_mod(&key.e, &key.n) {
@@ -107,10 +107,10 @@ pub fn rsa_encrypt(key: &RSAPublicKey, message: &[u8]) -> Vec<u8> {
             panic!();
         }
     };
-    c
+    c.to_digits::<u8>(Order::Msf)
 }
 
-#[cfg(target_os = "unix")]
+#[cfg(target_family = "unix")]
 pub fn rsa_decrypt(key: &RSAPrivateKey, message: &[u8]) -> Vec<u8> {
     let message = Integer::from_digits(message, Order::Msf);
     let m = match message.pow_mod(&key.d, &key.n) {
@@ -120,21 +120,21 @@ pub fn rsa_decrypt(key: &RSAPrivateKey, message: &[u8]) -> Vec<u8> {
     m.to_digits::<u8>(Order::Msf)
 }
 
-#[cfg(target_os = "windows")]
+#[cfg(target_family = "windows")]
 pub fn rsa_encrypt(key: &RSAPublicKey, message: &[u8]) -> Vec<u8> {
     BigUint::from_bytes_be(message)
         .modpow(&key.e, &key.n)
         .to_bytes_be()
 }
 
-#[cfg(target_os = "windows")]
+#[cfg(target_family = "windows")]
 pub fn rsa_decrypt(key: &RSAPrivateKey, message: &[u8]) -> Vec<u8> {
     BigUint::from_bytes_be(message)
         .modpow(&key.d, &key.n)
         .to_bytes_be()
 }
 
-#[cfg(target_os = "unix")]
+#[cfg(target_family = "unix")]
 pub fn rsa_key_gen() -> (RSAPublicKey, RSAPrivateKey) {
     let mut rng = rug::rand::RandState::new();
     let p = miller_rabin(2048, 7, &mut rng);
@@ -152,7 +152,7 @@ pub fn rsa_key_gen() -> (RSAPublicKey, RSAPrivateKey) {
     (RSAPublicKey::new(n.clone(), e), RSAPrivateKey::new(n, d))
 }
 
-#[cfg(target_os = "windows")]
+#[cfg(target_family = "windows")]
 pub fn rsa_key_gen() -> (RSAPublicKey, RSAPrivateKey) {
     use std::str::FromStr;
 

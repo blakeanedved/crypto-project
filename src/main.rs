@@ -1,13 +1,14 @@
 mod aes;
 mod client;
-#[cfg(target_os = "unix")]
+#[cfg(target_family = "unix")]
 mod miller_rabin;
-#[cfg(target_os = "windows")]
+#[cfg(target_family = "windows")]
 mod miller_rabin_win;
 mod rsa;
 mod server;
 mod utils;
 
+#[cfg(target_family = "windows")]
 extern crate num_bigint_dig as num_bigint;
 
 use clap::{Parser, Subcommand};
